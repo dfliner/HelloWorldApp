@@ -31,6 +31,9 @@ Console.WriteLine("New balance after deposit: {0}", bankAccount.Balance);
 Console.WriteLine("All transactions:");
 Console.WriteLine(bankAccount.ReportTransactionHistory());
 
+var creditcard = new CreditAccount(customer, 0);
+creditcard.MakeWithdrawal(100m, DateTime.Now, "Take out monthly advance");
+
 try
 {
     BankAccount invalidAccount = new BankAccount(customer, -55);

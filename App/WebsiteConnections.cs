@@ -1,96 +1,91 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿namespace HelloWorldApp;
 
-namespace HelloWorldApp
+public interface IWebsiteConnections
 {
-    public interface IWebsiteConnections
+    IList<string> WebSites { get; }
+    Task ConnectInSequentialAsync(string protocol);
+    Task ConnectInParallelAsync(string protocol);
+}
+
+public abstract class WebsiteConnectionsBase
+{
+    protected readonly IList<string> websites;
+
+    public WebsiteConnectionsBase(IList<string> websites)
     {
-        IList<string> WebSites { get; }
-        Task ConnectInSequentialAsync(string protocol);
-        Task ConnectInParallelAsync(string protocol);
+        this.websites = websites;
     }
 
-    public abstract class WebsiteConnectionsBase
-    {
-        protected readonly IList<string> websites;
+    public IList<string> Websites => websites;
+}
 
-        public WebsiteConnectionsBase(IList<string> websites)
-        {
-            this.websites = websites;
-        }
 
-        public IList<string> Websites => websites;
-    }
+/// <summary>
+/// Manages http connections to websites.
+/// </summary>
+public class WebsiteConnections : WebsiteConnectionsBase, IWebsiteConnections
+{
+    IList<string> IWebsiteConnections.WebSites => base.Websites;
+    // or
+    // public IList<string> WebSites => base.Websites;
 
+    //private readonly IList<string> websites;
 
     /// <summary>
-    /// Manages http connections to websites.
+    /// Initializes a new instance of the <see cref="WebsiteConnections"/> class, to manage http
+    /// connections to the specified websites.
     /// </summary>
-    public class WebsiteConnections : WebsiteConnectionsBase, IWebsiteConnections
+    /// <param name="websites">The list of websites.</param>
+    public WebsiteConnections(IList<string> websites)
+        : base(websites)
     {
-        public IList<string> WebSites => base.Websites;
+        //this.websites = websites;
+    }
 
-        //private readonly IList<string> websites;
+    /// <summary>
+    /// Connects to websites in sequential order. It is guaranteed that websites are connected
+    /// sequentially based upon their index order.
+    /// </summary>
+    /// <param name="protocol">The protocol used to connect to the websites.</param>
+    /// <returns></returns>
+    public async Task ConnectInSequentialAsync(string protocol)
+    {
+        Console.WriteLine("Connecting to websites in sequential order");
 
-        /// <summary>
-        /// Initializes a new instance of the <see cref="WebsiteConnections"/> class, to manage http
-        /// connections to the specified websites.
-        /// </summary>
-        /// <param name="websites">The list of websites.</param>
-        public WebsiteConnections(IList<string> websites)
-            : base(websites)
+        for (int i = 0; i < websites.Count; i++)
         {
-            //this.websites = websites;
+            using var client = new HttpClient();
+            var result = await client.GetAsync($"{protocol}://{websites[i]}");
+            Console.WriteLine($"Connection {i} - {websites[i]}: {result.StatusCode}");
         }
+    }
 
-        /// <summary>
-        /// Connects to websites in sequential order. It is guaranteed that websites are connected
-        /// sequentially based upon their index order.
-        /// </summary>
-        /// <param name="protocol">The protocol used to connect to the websites.</param>
-        /// <returns></returns>
-        public async Task ConnectInSequentialAsync(string protocol)
+    /// <summary>
+    /// Connects to websites in parallel order. All connections are parallelized and there is no
+    /// guarantee that websites are connected sequentially in index order.
+    /// </summary>
+    /// <param name="protocol">The protocol used to connect to the websites.</param>
+    /// <returns></returns>
+    public async Task ConnectInParallelAsync(string protocol)
+    {
+        Console.WriteLine("Connecting to webstes in parallel order");
+
+        IList<Task> tasks = new List<Task>();
+
+        for (int i = 0; i < websites.Count; i++)
         {
-            Console.WriteLine("Connecting to websites in sequential order");
+            int index = i;
+            string website = websites[i];
 
-            for (int i = 0; i < websites.Count; i++)
+            var task = Task.Run(async () =>
             {
                 using var client = new HttpClient();
-                var result = await client.GetAsync($"{protocol}://{websites[i]}");
-                Console.WriteLine($"Connection {i} - {websites[i]}: {result.StatusCode}");
-            }
+                var result = await client.GetAsync($"{protocol}://{website}");
+                Console.WriteLine($"Connection {index} - {website}: {result.StatusCode}");
+            });
+            tasks.Add(task);
         }
 
-        /// <summary>
-        /// Connects to websites in parallel order. All connections are parallelized and there is no
-        /// guarantee that websites are connected sequentially in index order.
-        /// </summary>
-        /// <param name="protocol">The protocol used to connect to the websites.</param>
-        /// <returns></returns>
-        public async Task ConnectInParallelAsync(string protocol)
-        {
-            Console.WriteLine("Connecting to webstes in parallel order");
-
-            IList<Task> tasks = new List<Task>();
-
-            for (int i = 0; i < websites.Count; i++)
-            {
-                int index = i;
-                string website = websites[i];
-
-                var task = Task.Run(async () =>
-                {
-                    using var client = new HttpClient();
-                    var result = await client.GetAsync($"{protocol}://{website}");
-                    Console.WriteLine($"Connection {index} - {website}: {result.StatusCode}");
-                });
-                tasks.Add(task);
-            }
-
-            await Task.WhenAll(tasks.ToArray());
-        }
+        await Task.WhenAll(tasks.ToArray());
     }
 }
